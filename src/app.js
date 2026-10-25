@@ -4,15 +4,24 @@ import { checkActivity, isRestricted, initializeSecurity, resetSecurity, reportI
 const form = document.querySelector('#application-form');
 const filter = document.querySelector('#filter');
 const list = document.querySelector('#application-list');
+const submitButton = document.querySelector('#submit-button');
 const names = { html: 'HTML и CSS', javascript: 'JavaScript и DOM', api: 'HTTP и API' };
 let applications = [];
 let selectedId = null;
 let revision = 0;
+let submitting = false; // R6: защита от повторной отправки
 
 function setFormStatus(text, state = 'idle') {
   const status = document.querySelector('#form-status');
   status.textContent = text;
   status.dataset.state = state;
+}
+
+// R6: блокируем кнопку и запоминаем, что отправка идёт
+function setBusy(busy) {
+  submitting = busy;
+  submitButton.disabled = busy;
+  form.setAttribute('aria-busy', String(busy));
 }
 
 function permitted(action, details = {}) {
@@ -28,8 +37,9 @@ function validate(values) {
   return '';
 }
 
+// R7: комментарий выводится как текст, а не как HTML
 function renderComment(element, text) {
-  element.innerHTML = text || 'Без комментария';
+  element.textContent = text || 'Без комментария';
 }
 
 function renderSelection() {
@@ -46,7 +56,8 @@ function renderApplications() {
   const visible = applications.filter(item => filter.value === 'all' || item.topic === filter.value);
   const focusedId = document.activeElement?.closest('.application-card')?.dataset.id;
   list.replaceChildren();
-  document.querySelector('#application-count').textContent = String(applications.length);
+  // R2: счётчик равен числу видимых карточек
+  document.querySelector('#application-count').textContent = String(visible.length);
   document.querySelector('#empty-state').hidden = visible.length > 0;
 
   for (const application of visible) {
@@ -76,8 +87,8 @@ function renderApplications() {
     arrow.setAttribute('aria-hidden', 'true');
     body.append(name, topic, comment);
     card.append(index, body, arrow);
-    card.addEventListener('click', event => {
-      if (event.target !== card) return;
+    // R3: клик по любой части карточки выбирает заявку
+    card.addEventListener('click', () => {
       selectedId = application.id;
       renderApplications();
     });
@@ -103,25 +114,36 @@ async function loadApplications() {
 
 form.addEventListener('submit', async event => {
   event.preventDefault();
+  if (submitting) return; // R6
   const data = new FormData(form);
-  const values = { name: String(data.get('name') || ''), topic: String(data.get('topic') || ''), comment: String(data.get('comment') || '') };
-  if (!permitted('submit', { topic: values.topic, supportCode: String(data.get('supportCode') || '') })) return;
+  // R1: крайние пробелы удаляются до проверки
+  const values = {
+    name: String(data.get('name') || '').trim(),
+    topic: String(data.get('topic') || ''),
+    comment: String(data.get('comment') || ''),
+  };
+  if (!permitted('submit', { topic: values.topic, supportCode: String(data.get('supportCode') || '') })) {
+    setFormStatus('Отправка временно недоступна. Дождитесь окончания паузы.', 'error');
+    return;
+  }
   const error = validate(values);
   if (error) { setFormStatus(error, 'error'); return; }
   const currentRevision = revision;
+  setBusy(true);
   setFormStatus('Отправляем заявку…', 'pending');
-  form.setAttribute('aria-busy', 'true');
   try {
-    const response = await createApplication({ ...values, name: values.name.trim() });
+    const response = await createApplication(values);
     const result = await response.json();
     if (currentRevision !== revision) return;
-    setFormStatus('Заявка сохранена. Спасибо!', 'success');
+    // R8: успех только при положительном ответе сервиса
+    if (!response.ok) throw new Error(result?.error?.message || 'Не удалось отправить заявку.');
     form.reset();
     await loadApplications();
+    setFormStatus('Заявка сохранена. Спасибо!', 'success');
   } catch (error) {
     if (currentRevision === revision) setFormStatus(error.message || 'Не удалось отправить заявку.', 'error');
   } finally {
-    if (currentRevision === revision) form.setAttribute('aria-busy', 'false');
+    if (currentRevision === revision) setBusy(false);
   }
 });
 
@@ -132,11 +154,18 @@ filter.addEventListener('change', () => {
 });
 
 document.querySelector('#refresh-button').addEventListener('click', () => {
-  if (permitted('refresh')) loadApplications();
+  if (!permitted('refresh')) {
+    document.querySelector('#list-status').textContent = 'Обновление временно недоступно. Список можно читать.';
+    return;
+  }
+  loadApplications();
 });
 
+// R4: сброс формы, выбора и фильтра; заявки остаются
 document.querySelector('#reset-interface').addEventListener('click', () => {
   form.reset();
+  selectedId = null;
+  filter.value = 'all';
   setFormStatus('Интерфейс сброшен.');
   renderApplications();
 });
@@ -157,7 +186,7 @@ document.querySelector('#reset-lab').addEventListener('click', async () => {
   selectedId = null;
   filter.value = 'all';
   form.reset();
-  form.setAttribute('aria-busy', 'false');
+  setBusy(false);
   document.querySelector('#service-mode').value = 'normal';
   document.querySelector('#lab-status').textContent = getStorageProblem() || 'Исходные данные восстановлены.';
   setFormStatus('Заявка останется в этом браузере.');
