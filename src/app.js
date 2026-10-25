@@ -122,7 +122,10 @@ form.addEventListener('submit', async event => {
     topic: String(data.get('topic') || ''),
     comment: String(data.get('comment') || ''),
   };
-  if (!permitted('submit', { topic: values.topic, supportCode: String(data.get('supportCode') || '') })) return;
+  if (!permitted('submit', { topic: values.topic, supportCode: String(data.get('supportCode') || '') })) {
+    setFormStatus('Отправка временно недоступна. Дождитесь окончания паузы.', 'error');
+    return;
+  }
   const error = validate(values);
   if (error) { setFormStatus(error, 'error'); return; }
   const currentRevision = revision;
@@ -151,7 +154,11 @@ filter.addEventListener('change', () => {
 });
 
 document.querySelector('#refresh-button').addEventListener('click', () => {
-  if (permitted('refresh')) loadApplications();
+  if (!permitted('refresh')) {
+    document.querySelector('#list-status').textContent = 'Обновление временно недоступно. Список можно читать.';
+    return;
+  }
+  loadApplications();
 });
 
 // R4: сброс формы, выбора и фильтра; заявки остаются
