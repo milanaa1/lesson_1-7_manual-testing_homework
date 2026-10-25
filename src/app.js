@@ -46,7 +46,8 @@ function renderApplications() {
   const visible = applications.filter(item => filter.value === 'all' || item.topic === filter.value);
   const focusedId = document.activeElement?.closest('.application-card')?.dataset.id;
   list.replaceChildren();
-  document.querySelector('#application-count').textContent = String(applications.length);
+  // R2: счётчик равен числу видимых карточек
+  document.querySelector('#application-count').textContent = String(visible.length);
   document.querySelector('#empty-state').hidden = visible.length > 0;
 
   for (const application of visible) {
