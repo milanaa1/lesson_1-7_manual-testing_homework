@@ -104,7 +104,12 @@ async function loadApplications() {
 form.addEventListener('submit', async event => {
   event.preventDefault();
   const data = new FormData(form);
-  const values = { name: String(data.get('name') || ''), topic: String(data.get('topic') || ''), comment: String(data.get('comment') || '') };
+  // R1: крайние пробелы удаляются до проверки
+  const values = {
+    name: String(data.get('name') || '').trim(),
+    topic: String(data.get('topic') || ''),
+    comment: String(data.get('comment') || ''),
+  };
   if (!permitted('submit', { topic: values.topic, supportCode: String(data.get('supportCode') || '') })) return;
   const error = validate(values);
   if (error) { setFormStatus(error, 'error'); return; }
@@ -112,7 +117,7 @@ form.addEventListener('submit', async event => {
   setFormStatus('Отправляем заявку…', 'pending');
   form.setAttribute('aria-busy', 'true');
   try {
-    const response = await createApplication({ ...values, name: values.name.trim() });
+    const response = await createApplication(values);
     const result = await response.json();
     if (currentRevision !== revision) return;
     setFormStatus('Заявка сохранена. Спасибо!', 'success');
