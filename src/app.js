@@ -4,15 +4,24 @@ import { checkActivity, isRestricted, initializeSecurity, resetSecurity, reportI
 const form = document.querySelector('#application-form');
 const filter = document.querySelector('#filter');
 const list = document.querySelector('#application-list');
+const submitButton = document.querySelector('#submit-button');
 const names = { html: 'HTML и CSS', javascript: 'JavaScript и DOM', api: 'HTTP и API' };
 let applications = [];
 let selectedId = null;
 let revision = 0;
+let submitting = false; // R6: защита от повторной отправки
 
 function setFormStatus(text, state = 'idle') {
   const status = document.querySelector('#form-status');
   status.textContent = text;
   status.dataset.state = state;
+}
+
+// R6: блокируем кнопку и запоминаем, что отправка идёт
+function setBusy(busy) {
+  submitting = busy;
+  submitButton.disabled = busy;
+  form.setAttribute('aria-busy', String(busy));
 }
 
 function permitted(action, details = {}) {
@@ -104,6 +113,7 @@ async function loadApplications() {
 
 form.addEventListener('submit', async event => {
   event.preventDefault();
+  if (submitting) return; // R6
   const data = new FormData(form);
   // R1: крайние пробелы удаляются до проверки
   const values = {
@@ -115,8 +125,8 @@ form.addEventListener('submit', async event => {
   const error = validate(values);
   if (error) { setFormStatus(error, 'error'); return; }
   const currentRevision = revision;
+  setBusy(true);
   setFormStatus('Отправляем заявку…', 'pending');
-  form.setAttribute('aria-busy', 'true');
   try {
     const response = await createApplication(values);
     const result = await response.json();
@@ -127,7 +137,7 @@ form.addEventListener('submit', async event => {
   } catch (error) {
     if (currentRevision === revision) setFormStatus(error.message || 'Не удалось отправить заявку.', 'error');
   } finally {
-    if (currentRevision === revision) form.setAttribute('aria-busy', 'false');
+    if (currentRevision === revision) setBusy(false);
   }
 });
 
@@ -166,7 +176,7 @@ document.querySelector('#reset-lab').addEventListener('click', async () => {
   selectedId = null;
   filter.value = 'all';
   form.reset();
-  form.setAttribute('aria-busy', 'false');
+  setBusy(false);
   document.querySelector('#service-mode').value = 'normal';
   document.querySelector('#lab-status').textContent = getStorageProblem() || 'Исходные данные восстановлены.';
   setFormStatus('Заявка останется в этом браузере.');
