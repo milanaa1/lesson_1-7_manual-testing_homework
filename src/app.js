@@ -77,8 +77,8 @@ function renderApplications() {
     arrow.setAttribute('aria-hidden', 'true');
     body.append(name, topic, comment);
     card.append(index, body, arrow);
-    card.addEventListener('click', event => {
-      if (event.target !== card) return;
+    // R3: клик по любой части карточки выбирает заявку
+    card.addEventListener('click', () => {
       selectedId = application.id;
       renderApplications();
     });
