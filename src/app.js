@@ -37,8 +37,9 @@ function validate(values) {
   return '';
 }
 
+// R7: комментарий выводится как текст, а не как HTML
 function renderComment(element, text) {
-  element.innerHTML = text || 'Без комментария';
+  element.textContent = text || 'Без комментария';
 }
 
 function renderSelection() {
