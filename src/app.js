@@ -141,8 +141,11 @@ document.querySelector('#refresh-button').addEventListener('click', () => {
   if (permitted('refresh')) loadApplications();
 });
 
+// R4: сброс формы, выбора и фильтра; заявки остаются
 document.querySelector('#reset-interface').addEventListener('click', () => {
   form.reset();
+  selectedId = null;
+  filter.value = 'all';
   setFormStatus('Интерфейс сброшен.');
   renderApplications();
 });
