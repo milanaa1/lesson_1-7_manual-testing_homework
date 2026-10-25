@@ -132,9 +132,11 @@ form.addEventListener('submit', async event => {
     const response = await createApplication(values);
     const result = await response.json();
     if (currentRevision !== revision) return;
-    setFormStatus('Заявка сохранена. Спасибо!', 'success');
+    // R8: успех только при положительном ответе сервиса
+    if (!response.ok) throw new Error(result?.error?.message || 'Не удалось отправить заявку.');
     form.reset();
     await loadApplications();
+    setFormStatus('Заявка сохранена. Спасибо!', 'success');
   } catch (error) {
     if (currentRevision === revision) setFormStatus(error.message || 'Не удалось отправить заявку.', 'error');
   } finally {
